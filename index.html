@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Soccer Legends 3D - NextGen Crane</title>
+
+  <!-- Three.js & PostProcessing (Unreal Engine Bloom 파이프라인) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+
+  <style>
+    * {
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-user-select: none;
+      margin: 0;
+      padding: 0;
+      touch-action: none;
+    }
+    body, html {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #030712;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    #canvas3d {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    /* 게임 UI 전광판 (하이엔드 사이버펑크/스포츠 UI) */
+    .game-ui {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 20px;
+    }
+
+    .top-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .status-panel {
+      background: linear-gradient(135deg, rgba(15, 23, 42, 0.8), rgba(30, 41, 59, 0.5));
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 0 15px rgba(56, 189, 248, 0.2);
+      backdrop-filter: blur(16px);
+      padding: 10px 18px;
+      border-radius: 14px;
+    }
+    .status-label {
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 1.5px;
+      color: #94a3b8;
+      text-transform: uppercase;
+    }
+    .status-val {
+      font-size: 24px;
+      font-weight: 900;
+      color: #f8fafc;
+      text-shadow: 0 0 12px rgba(56, 189, 248, 0.8);
+    }
+
+    /* 하단 조이스틱 패드 */
+    .controls-panel {
+      pointer-events: auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      padding-bottom: 12px;
+    }
+    .dpad-cluster {
+      width: 160px;
+      height: 160px;
+      position: relative;
+    }
+    .ctrl-key {
+      position: absolute;
+      width: 50px;
+      height: 50px;
+      background: linear-gradient(145deg, #1e293b, #0f172a);
+      border: 2px solid rgba(255, 255, 255, 0.15);
+      border-radius: 14px;
+      color: #38bdf8;
+      font-size: 22px;
+      font-weight: 900;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 6px 16px rgba(0,0,0,0.4), inset 0 1px 1px rgba(255,255,255,0.2);
+      cursor: pointer;
+      transition: all 0.1s;
+    }
+    .ctrl-key:active, .ctrl-key.active {
+      transform: scale(0.92);
+      background: #0284c7;
+      color: #fff;
+      box-shadow: 0 0 20px rgba(56, 189, 248, 0.8);
+    }
+    .k-up    { top: 0; left: 55px; }
+    .k-down  { bottom: 0; left: 55px; }
+    .k-left  { top: 55px; left: 0; }
+    .k-right { top: 55px; right: 0; }
+
+    /* 대형 CATCH 버튼 */
+    .catch-act-btn {
+      width: 120px;
+      height: 120px;
+      background: radial-gradient(circle at 35% 35%, #ff4b4b, #b91c1c 65%, #7f1d1d);
+      border: 4px solid rgba(255, 255, 255, 0.6);
+      border-radius: 50%;
+      color: #fff;
+      font-size: 20px;
+      font-weight: 900;
+      letter-spacing: 1.5px;
+      box-shadow: 0 10px 30px rgba(239, 68, 68, 0.6), 0 0 40px rgba(239, 68, 68, 0.4), inset 0 2px 8px rgba(255,255,255,0.7);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.1s;
+    }
+    .catch-act-btn:active {
+      transform: scale(0.92);
+      box-shadow: 0 4px 15px rgba(239, 68, 68, 0.8);
+    }
+
+    /* 포획 팝업 모달 */
+    .legend-modal {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) scale(0.8);
+      background: linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(3, 7, 18, 0.95));
+      border: 2px solid #fbbf24;
+      box-shadow: 0 0 50px rgba(251, 191, 36, 0.5), 0 20px 40px rgba(0,0,0,0.9);
+      padding: 28px 36px;
+      border-radius: 24px;
+      text-align: center;
+      color: #fff;
+      z-index: 100;
+      opacity: 0;
+      pointer-events: none;
+      transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    .legend-modal.show {
+      opacity: 1;
+      transform: translate(-50%, -50%) scale(1);
+      pointer-events: auto;
+    }
+    .legend-rank {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 900;
+      letter-spacing: 2px;
+      color: #fbbf24;
+      background: rgba(251, 191, 36, 0.15);
+      border: 1px solid rgba(251, 191, 36, 0.4);
+      padding: 4px 12px;
+      border-radius: 20px;
+      margin-bottom: 10px;
+    }
+    .legend-name {
+      font-size: 32px;
+      font-weight: 900;
+      color: #fff;
+      margin-bottom: 6px;
+      text-shadow: 0 0 20px rgba(255,255,255,0.5);
+    }
+    .legend-sub {
+      font-size: 14px;
+      color: #94a3b8;
+      margin-bottom: 20px;
+    }
+    .btn-collect {
+      background: linear-gradient(to right, #fbbf24, #f59e0b);
+      color: #0f172a;
+      border: none;
+      padding: 12px 32px;
+      font-size: 16px;
+      font-weight: 900;
+      border-radius: 14px;
+      cursor: pointer;
+      box-shadow: 0 6px 20px rgba(245, 158, 11, 0.4);
+    }
+  </style>
+</head>
+<body>
+
+  <canvas id="canvas3d"></canvas>
+
+  <div class="game-ui">
+    <div class="top-header">
+      <div class="status-panel">
+        <div class="status-label">Collection</div>
+        <div id="ui-count" class="status-val">0 / 13</div>
+      </div>
+      <div class="status-panel" style="text-align: right;">
+        <div class="status-label">Total Score</div>
+        <div id="ui-score" class="status-val">0</div>
+      </div>
+    </div>
+
+    <div class="controls-panel">
+      <div class="dpad-cluster">
+        <div class="ctrl-key k-up" data-k="up">▲</div>
+        <div class="ctrl-key k-down" data-k="down">▼</div>
+        <div class="ctrl-key k-left" data-k="left">◀</div>
+        <div class="ctrl-key k-right" data-k="right">▶</div>
+      </div>
+      <div id="act-catch" class="catch-act-btn">
+        <span>CATCH</span>
+      </div>
+    </div>
+  </div>
+
+  <div id="legend-modal" class="legend-modal">
+    <div class="legend-rank">LEGENDARY FIGURE</div>
+    <div id="modal-player-name" class="legend-name">손흥민</div>
+    <div id="modal-player-desc" class="legend-sub">토트넘 홋스퍼 & 대한민국 캡틴</div>
+    <button id="btn-modal-close" class="btn-collect">수집함에 넣기</button>
+  </div>
+
+  <script>
+    /* ========================================================
+       1. 13인 축구선수 리얼 피규어 사양 (3D 파라메트릭 데이터)
+       ======================================================== */
+    const PLAYERS_SPEC = [
+      { id: 'pele', name: "펠레", title: "축구의 황제 (3회 월드컵 우승)", kit: 0xfacc15, kitSec: 0x15803d, skin: 0x4a2a19, hair: 0x111111, hairType: 'classic_buzz', shoes: 0x111111, score: 500, ball: true },
+      { id: 'maradona', name: "마라도나", title: "신의 손 (디에고 아르만도)", kit: 0x38bdf8, kitSec: 0xffffff, skin: 0xc68652, hair: 0x1c1917, hairType: 'curly_afro', shoes: 0x000000, score: 500 },
+      { id: 'zidane', name: "지단", title: "마에스트로 (발롱도르 & 유로 우승)", kit: 0x1e3a8a, kitSec: 0xdc2626, skin: 0xdeb887, hair: 0x8b5a2b, hairType: 'monk_bald', shoes: 0x111827, score: 400 },
+      { id: 'ronaldo', name: "호날두", title: "CR7 (챔피언스리그 역대 최다골)", kit: 0xdc2626, kitSec: 0x15803d, skin: 0xca8a5b, hair: 0x0f172a, hairType: 'slick_pomade', shoes: 0x22c55e, score: 350 },
+      { id: 'messi', name: "메시", title: "GOAT (8회 발롱도르 & 월드컵 우승)", kit: 0x38bdf8, kitSec: 0xffffff, skin: 0xdfa178, hair: 0x543310, hairType: 'beard_messi', shoes: 0x38bdf8, score: 450, ball: true },
+      { id: 'mbappe', name: "음바페", title: "차세대 골게터 (레알 마드리드)", kit: 0xffffff, kitSec: 0x1e3a8a, skin: 0x603a1e, hair: 0x0a0a0a, hairType: 'taper_fade', shoes: 0xec4899, score: 300 },
+      { id: 'haaland', name: "홀란드", title: "괴물 스트라이커 (맨체스터 시티)", kit: 0x7dd3fc, kitSec: 0xffffff, skin: 0xfbd0b0, hair: 0xfef08a, hairType: 'viking_bun', shoes: 0xeab308, score: 300 },
+      { id: 'kane', name: "케인", title: "바이에른 뮌헨의 주포 (잉글랜드 캡틴)", kit: 0xdc2626, kitSec: 0xffffff, skin: 0xfce7d4, hair: 0xa16207, hairType: 'short_quiff', shoes: 0x000000, score: 280 },
+      { id: 'son', name: "손흥민", title: "슈퍼 소니 (프리미어리그 득점왕)", kit: 0xffffff, kitSec: 0x1e3a8a, skin: 0xf3c4a2, hair: 0x18181b, hairType: 'dandy_cut', shoes: 0x38bdf8, score: 380, pose: 'camera' },
+      { id: 'lee', name: "이강인", title: "골든보이 (PSG 미드필더)", kit: 0x1e3a8a, kitSec: 0xdc2626, skin: 0xf3c4a2, hair: 0x1c1917, hairType: 'two_block', shoes: 0xf97316, score: 280 },
+      { id: 'cha', name: "차범근", title: "차붐 (분데스리가 레전드)", kit: 0xb91c1c, kitSec: 0x000000, skin: 0xc4814d, hair: 0x111111, hairType: 'retro_70s', shoes: 0x111827, score: 400 },
+      { id: 'park', name: "박지성", title: "산소탱크 (맨체스터 유나이티드 레전드)", kit: 0xdc2626, kitSec: 0xffffff, skin: 0xe0a982, hair: 0x18181b, hairType: 'classic_park', shoes: 0x111827, score: 350 },
+      { id: 'yamal', name: "야말", title: "유로 최연소 영플레이어 (바르셀로나)", kit: 0x831843, kitSec: 0x1e3a8a, skin: 0x7c4927, hair: 0x0f172a, hairType: 'fade_braid', shoes: 0x22c55e, score: 260 }
+    ];
+
+    /* ========================================================
+       2. THREE.JS 엔진 및 포스트 프로세싱 (Unreal Engine Bloom)
+       ======================================================== */
+    const canvas = document.getElementById('canvas3d');
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x060913);
+
+    const camera = new THREE.PerspectiveCamera(46, window.innerWidth / window.innerHeight, 0.1, 100);
+    camera.position.set(0, 15, 17);
+    camera.lookAt(0, 1.2, 0);
+
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.25;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+    // 포스트 프로세싱 컴포저 (블룸 효과)
+    const renderScene = new THREE.RenderPass(scene, camera);
+    const bloomPass = new THREE.UnrealBloomPass(
+      new THREE.Vector2(window.innerWidth, window.innerHeight),
+      0.85, // 강도 (Strength)
+      0.4,  // 반경 (Radius)
+      0.85  // 임계값 (Threshold)
+    );
+    const composer = new THREE.EffectComposer(renderer);
+    composer.addPass(renderScene);
+    composer.addPass(bloomPass);
+
+    // 조명 세팅 (언리얼 스튜디오 스타일)
+    const hemiLight = new THREE.HemisphereLight(0xdbeafe, 0x1e293b, 0.8);
+    scene.add(hemiLight);
+
+    const keyLight = new THREE.DirectionalLight(0xfff7ed, 1.8);
+    keyLight.position.set(10, 24, 12);
+    keyLight.castShadow = true;
+    keyLight.shadow.mapSize.width = 2048;
+    keyLight.shadow.mapSize.height = 2048;
+    keyLight.shadow.bias = -0.0001;
+    scene.add(keyLight);
+
+    const fillLight = new THREE.DirectionalLight(0x38bdf8, 1.2);
+    fillLight.position.set(-12, 10, -8);
+    scene.add(fillLight);
+
+    /* ========================================================
+       3. 디테일 축구장 & 경기장 아케이드 머신 환경
+       ======================================================== */
+    // 하이엔드 잔디 필드 (절차적 셰이딩 질감)
+    const pitchMat = new THREE.MeshStandardMaterial({
+      color: 0x15803d,
+      roughness: 0.65,
+      metalness: 0.1
+    });
+    const pitch = new THREE.Mesh(new THREE.BoxGeometry(14, 0.5, 14), pitchMat);
+    pitch.position.y = -0.25;
+    pitch.receiveShadow = true;
+    scene.add(pitch);
+
+    // 센터 서클 및 라인
+    const lineMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.35 });
+    const circleLine = new THREE.Mesh(new THREE.RingGeometry(2.4, 2.5, 48), lineMat);
+    circleLine.rotation.x = -Math.PI / 2;
+    circleLine.position.y = 0.01;
+    scene.add(circleLine);
+
+    // 아케이드 글래스 케이스 & 사이버 네온 코너 기둥
+    const cornerMat = new THREE.MeshStandardMaterial({ color: 0x0284c7, metalness: 0.9, roughness: 0.1, emissive: 0x0284c7, emissiveIntensity: 0.5 });
+    [[-6.9, -6.9], [6.9, -6.9], [-6.9, 6.9], [6.9, 6.9]].forEach(([px, pz]) => {
+      const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 9, 16), cornerMat);
+      pillar.position.set(px, 4.5, pz);
+      scene.add(pillar);
+    });
+
+    /* ========================================================
+       4. 고차원 3D 피규어 생성 엔진 (PBR & 인체 비례 조형)
+       ======================================================== */
+    const figureInstances = [];
+
+    // PVC 피규어 코팅 머티리얼 팩토리
+    const createPvcMat = (color, roughness = 0.25) => new THREE.MeshPhysicalMaterial({
+      color,
+      roughness,
+      metalness: 0.05,
+      clearcoat: 0.8,
+      clearcoatRoughness: 0.2
+    });
+
+    function buildRealisticPlayer(spec, posX, posZ) {
+      const root = new THREE.Group();
+      root.userData = spec;
+
+      // 1. 디럭스 트로피 전용 베이스
+      const basePlatform = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.75, 0.85, 0.18, 32),
+        new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.85, roughness: 0.2 })
+      );
+      basePlatform.castShadow = true;
+      basePlatform.receiveShadow = true;
+      root.add(basePlatform);
+
+      // 골드 링 테두리
+      const goldRing = new THREE.Mesh(
+        new THREE.TorusGeometry(0.78, 0.03, 16, 48),
+        new THREE.MeshStandardMaterial({ color: 0xfbbf24, metalness: 0.95, roughness: 0.1, emissive: 0xf59e0b, emissiveIntensity: 0.3 })
+      );
+      goldRing.rotation.x = Math.PI / 2;
+      goldRing.position.y = 0.08;
+      root.add(goldRing);
+
+      // 머티리얼 구성
+      const skinMat = createPvcMat(spec.skin, 0.4);
+      const kitMat = createPvcMat(spec.kit, 0.3);
+      const kitSecMat = createPvcMat(spec.kitSec, 0.3);
+      const shoeMat = createPvcMat(spec.shoes, 0.2);
+      const hairMat = new THREE.MeshStandardMaterial({ color: spec.hair, roughness: 0.7 });
+
+      // 2. 다리 & 스파이크 축구화
+      [-0.22, 0.22].forEach((lx, idx) => {
+        // 축구화 (인체공학적 조형)
+        const shoe = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.12, 0.38), shoeMat);
+        shoe.position.set(lx, 0.14, 0.05);
+        shoe.castShadow = true;
+        root.add(shoe);
+
+        // 스타킹(양말) & 정강이
+        const sock = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.085, 0.45, 16), kitSecMat);
+        sock.position.set(lx, 0.4, 0);
+        sock.castShadow = true;
+        root.add(sock);
+
+        // 허벅지 근육
+        const thigh = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.1, 0.35, 16), skinMat);
+        thigh.position.set(lx, 0.75, 0);
+        root.add(thigh);
+
+        // 유니폼 반바지
+        const pant = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.13, 0.28, 16), kitSecMat);
+        pant.position.set(lx, 0.95, 0);
+        root.add(pant);
+      });
+
+      // 3. 유니폼 상체 & 어깨 삼각근
+      const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.26, 0.72, 20), kitMat);
+      torso.position.set(0, 1.4, 0);
+      torso.castShadow = true;
+      root.add(torso);
+
+      // 팔 & 글러브/손
+      [-0.44, 0.44].forEach((ax, idx) => {
+        const shoulder = new THREE.Mesh(new THREE.SphereGeometry(0.14, 16, 16), kitMat);
+        shoulder.position.set(ax * 0.9, 1.68, 0);
+        root.add(shoulder);
+
+        const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.07, 0.5, 16), skinMat);
+        arm.position.set(ax, 1.38, 0);
+        arm.rotation.z = idx === 0 ? 0.25 : -0.25;
+        arm.castShadow = true;
+        root.add(arm);
+
+        const hand = new THREE.Mesh(new THREE.SphereGeometry(0.085, 12, 12), skinMat);
+        hand.position.set(ax * 1.15, 1.1, 0);
+        root.add(hand);
+      });
+
+      // 4. 리얼리틱 캐주얼 헤드 (턱선, 코, 귀)
+      const head = new THREE.Mesh(new THREE.SphereGeometry(0.35, 24, 24), skinMat);
+      head.position.set(0, 2.05, 0);
+      head.scale.set(1, 1.15, 1.05);
+      head.castShadow = true;
+      root.add(head);
+
+      // 코
+      const nose = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.12, 8), skinMat);
+      nose.position.set(0, 2.04, 0.38);
+      nose.rotation.x = Math.PI / 2;
+      root.add(nose);
+
+      // 눈 (깊이감 있는 눈매 조형)
+      const eyeMat = new THREE.MeshBasicMaterial({ color: 0x0f172a });
+      [-0.11, 0.11].forEach(ex => {
+        const eye = new THREE.Mesh(new THREE.SphereGeometry(0.045, 12, 12), eyeMat);
+        eye.position.set(ex, 2.12, 0.33);
+        root.add(eye);
+      });
+
+      // 5. 13인 시그니처 정밀 헤어스타일
+      const ht = spec.hairType;
+      if (ht === 'curly_afro') { // 마라도나의 풍성한 곱슬
+        for (let i = 0; i < 28; i++) {
+          const curl = new THREE.Mesh(new THREE.SphereGeometry(0.12, 10, 10), hairMat);
+          const theta = Math.random() * Math.PI;
+          const phi = Math.random() * Math.PI * 2;
+          curl.position.set(
+            0.36 * Math.sin(theta) * Math.cos(phi),
+            2.15 + 0.32 * Math.cos(theta),
+            0.36 * Math.sin(theta) * Math.sin(phi) - 0.05
+          );
+          root.add(curl);
+        }
+      } else if (ht === 'viking_bun') { // 홀란드 긴 금발 + 상단 번
+        const topHair = new THREE.Mesh(new THREE.SphereGeometry(0.38, 20, 20), hairMat);
+        topHair.position.set(0, 2.22, -0.05);
+        root.add(topHair);
+        const bun = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.04, 0.35, 12), hairMat);
+        bun.position.set(0, 2.38, -0.38);
+        bun.rotation.x = -1.2;
+        root.add(bun);
+      } else if (ht === 'monk_bald') { // 지단 삭발/음영 톤
+        const fringe = new THREE.Mesh(new THREE.CylinderGeometry(0.37, 0.38, 0.18, 24), hairMat);
+        fringe.position.set(0, 2.05, -0.05);
+        root.add(fringe);
+      } else if (ht === 'slick_pomade') { // 호날두 리젠트 슬릭백
+        const pomade = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.22, 0.58), hairMat);
+        pomade.position.set(0, 2.3, 0.03);
+        pomade.rotation.x = -0.25;
+        root.add(pomade);
+      } else if (ht === 'beard_messi') { // 메시 숏컷 + 턱수염
+        const hairCap = new THREE.Mesh(new THREE.SphereGeometry(0.38, 20, 20), hairMat);
+        hairCap.position.set(0, 2.2, -0.04);
+        root.add(hairCap);
+        const beard = new THREE.Mesh(new THREE.TorusGeometry(0.24, 0.06, 12, 24, Math.PI), hairMat);
+        beard.position.set(0, 1.9, 0.2);
+        beard.rotation.x = -Math.PI / 1.3;
+        root.add(beard);
+      } else { // 댄디/투블럭 (손흥민, 이강인, 박지성, 음바페 등)
+        const cap = new THREE.Mesh(new THREE.SphereGeometry(0.38, 20, 20), hairMat);
+        cap.position.set(0, 2.22, -0.02);
+        cap.scale.set(1.02, 0.95, 1.08);
+        root.add(cap);
+      }
+
+      // 6. 시그니처 소품 (축구공)
+      if (spec.ball) {
+        const ball = new THREE.Mesh(
+          new THREE.SphereGeometry(0.25, 20, 20),
+          new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.3 })
+        );
+        ball.position.set(0.42, 0.25, 0.28);
+        ball.castShadow = true;
+        root.add(ball);
+      }
+
+      // 7. 골드 네임플레이트
+      const plate = new THREE.Mesh(
+        new THREE.BoxGeometry(1.0, 0.22, 0.05),
+        new THREE.MeshStandardMaterial({ color: 0xfbbf24, metalness: 0.9, roughness: 0.2 })
+      );
+      plate.position.set(0, 0.12, 0.82);
+      root.add(plate);
+
+      root.position.set(posX, 0.1, posZ);
+      scene.add(root);
+      figureInstances.push(root);
+    }
+
+    // 13인 필드 배치
+    function initFieldFigures() {
+      const coords = [
+        [-3.8, -3.8], [0, -3.8], [3.8, -3.8],
+        [-4.5, -1.2], [-1.5, -1.2], [1.5, -1.2], [4.5, -1.2],
+        [-3.8, 1.5], [0, 1.5], [3.8, 1.5],
+        [-3.2, 4.0], [0, 4.0], [3.2, 4.0]
+      ];
+      PLAYERS_SPEC.forEach((spec, i) => {
+        buildRealisticPlayer(spec, coords[i][0], coords[i][1]);
+      });
+    }
+    initFieldFigures();
+
+    /* ========================================================
+       5. 차세대 고정밀 아케이드 크레인 & 레이저 조준 시스템
+       ======================================================== */
+    const craneGantry = new THREE.Group();
+    craneGantry.position.set(0, 8.5, 0);
+    scene.add(craneGantry);
+
+    // X/Z 메탈 갠트리 빔
+    const beamMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.9, roughness: 0.2 });
+    const beamX = new THREE.Mesh(new THREE.BoxGeometry(14, 0.3, 0.3), beamMat);
+    craneGantry.add(beamX);
+
+    // 크레인 모터 카트 (골드 아노다이징)
+    const cartMat = new THREE.MeshStandardMaterial({ color: 0xf59e0b, metalness: 0.9, roughness: 0.2 });
+    const trolleyCart = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.6, 1.6), cartMat);
+    trolleyCart.castShadow = true;
+    craneGantry.add(trolleyCart);
+
+    // 고강도 스틸 와이어 케이블
+    const cableWire = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.035, 0.035, 1, 16),
+      new THREE.MeshStandardMaterial({ color: 0xe2e8f0, metalness: 0.95, roughness: 0.1 })
+    );
+    cableWire.position.y = -0.5;
+    craneGantry.add(cableWire);
+
+    // 크레인 집게 어셈블리
+    const clawMech = new THREE.Group();
+    clawMech.position.y = -1;
+    craneGantry.add(clawMech);
+
+    const clawBody = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.55, 0.35, 20), cartMat);
+    clawBody.castShadow = true;
+    clawMech.add(clawBody);
+
+    // 레이저 타겟 라이트 (바닥 가이드 빔)
+    const laserBeam = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.015, 0.25, 7.5, 16),
+      new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.25, depthWrite: false })
+    );
+    laserBeam.position.y = -3.75;
+    clawMech.add(laserBeam);
+
+    // 3개 집게발 (정밀 메카닉 관절)
+    const clawPivots = [];
+    const chromeMat = new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 0.95, roughness: 0.1 });
+
+    for (let i = 0; i < 3; i++) {
+      const angle = (i * Math.PI * 2) / 3;
+      const pivot = new THREE.Group();
+      pivot.position.set(Math.cos(angle) * 0.42, -0.15, Math.sin(angle) * 0.42);
+      pivot.rotation.y = -angle;
+
+      const arm1 = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.85, 0.14), chromeMat);
+      arm1.position.y = -0.42;
+      arm1.rotation.z = -0.32;
+      arm1.castShadow = true;
+      pivot.add(arm1);
+
+      const arm2 = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.45, 12), chromeMat);
+      arm2.position.set(0.16, -0.85, 0);
+      arm2.rotation.z = 0.6;
+      pivot.add(arm2);
+
+      clawMech.add(pivot);
+      clawPivots.push(arm1);
+    }
+
+    /* ========================================================
+       6. 게임 인터랙션 & 물리 판정 로직
+       ======================================================== */
+    const keys = { up: false, down: false, left: false, right: false };
+    let isClawOperating = false;
+    let cableDepth = 1.0;
+    let totalScore = 0;
+    const collectedPlayers = new Set();
+    const CRANE_VELOCITY = 0.09;
+
+    // 조이스틱 터치 핸들링
+    document.querySelectorAll('.ctrl-key').forEach(el => {
+      const dir = el.getAttribute('data-k');
+      const onStart = (e) => { e.preventDefault(); keys[dir] = true; el.classList.add('active'); };
+      const onEnd = (e) => { e.preventDefault(); keys[dir] = false; el.classList.remove('active'); };
+      el.addEventListener('touchstart', onStart);
+      el.addEventListener('touchend', onEnd);
+      el.addEventListener('mousedown', onStart);
+      el.addEventListener('mouseup', onEnd);
+      el.addEventListener('mouseleave', onEnd);
+    });
+
+    const catchBtn = document.getElementById('act-catch');
+    catchBtn.addEventListener('click', performCatch);
+    catchBtn.addEventListener('touchstart', (e) => { e.preventDefault(); performCatch(); });
+
+    function performCatch() {
+      if (isClawOperating) return;
+      isClawOperating = true;
+
+      // 발톱 개방
+      clawPivots.forEach(a => a.rotation.z = -0.55);
+
+      let isDown = true;
+      const MAX_DEPTH = 6.8;
+      let targetFig = null;
+
+      const actTimer = setInterval(() => {
+        if (isDown) {
+          cableDepth += 0.1;
+          if (cableDepth >= MAX_DEPTH) {
+            isDown = false;
+            // 발톱 폐쇄 (포획 시도)
+            clawPivots.forEach(a => a.rotation.z = 0.22);
+
+            const clawPos = new THREE.Vector3();
+            clawMech.getWorldPosition(clawPos);
+
+            // 포획 반경 체크
+            for (let fig of figureInstances) {
+              if (fig.userData.isGrabbed) continue;
+              const dist = Math.hypot(clawPos.x - fig.position.x, clawPos.z - fig.position.z);
+              if (dist < 1.05) {
+                targetFig = fig;
+                fig.userData.isGrabbed = true;
+                break;
+              }
+            }
+          }
+        } else {
+          // 인양 단계
+          cableDepth -= 0.08;
+          if (targetFig) {
+            targetFig.position.y = 8.5 - cableDepth - 2.1;
+            targetFig.position.x = craneGantry.position.x;
+            targetFig.position.z = craneGantry.position.z;
+          }
+
+          if (cableDepth <= 1.0) {
+            cableDepth = 1.0;
+            clearInterval(actTimer);
+            isClawOperating = false;
+            clawPivots.forEach(a => a.rotation.z = -0.32);
+
+            if (targetFig) {
+              onSuccessGrab(targetFig);
+            }
+          }
+        }
+
+        // 케이블 신축 반영
+        cableWire.scale.set(1, cableDepth, 1);
+        cableWire.position.y = -cableDepth / 2;
+        clawMech.position.y = -cableDepth;
+      }, 16);
+    }
+
+    // 포획 성공 모달 및 스코어 연산
+    function onSuccessGrab(fig) {
+      const data = fig.userData;
+      totalScore += data.score;
+      document.getElementById('ui-score').innerText = totalScore;
+
+      collectedPlayers.add(data.id);
+      document.getElementById('ui-count').innerText = `${collectedPlayers.size} / 13`;
+
+      document.getElementById('modal-player-name').innerText = data.name;
+      document.getElementById('modal-player-desc').innerText = `${data.title} (+${data.score}점)`;
+      document.getElementById('legend-modal').classList.add('show');
+
+      scene.remove(fig);
+      const idx = figureInstances.indexOf(fig);
+      if (idx > -1) figureInstances.splice(idx, 1);
+
+      if (figureInstances.length === 0) {
+        setTimeout(initFieldFigures, 1200);
+      }
+    }
+
+    document.getElementById('btn-modal-close').addEventListener('click', () => {
+      document.getElementById('legend-modal').classList.remove('show');
+    });
+
+    /* ========================================================
+       7. 60FPS 렌더링 파이프라인 루프
+       ======================================================== */
+    function renderLoop() {
+      requestAnimationFrame(renderLoop);
+
+      // 크레인 X/Z 이동 제한
+      if (!isClawOperating) {
+        if (keys.up && craneGantry.position.z > -4.8) craneGantry.position.z -= CRANE_VELOCITY;
+        if (keys.down && craneGantry.position.z < 4.8) craneGantry.position.z += CRANE_VELOCITY;
+        if (keys.left && craneGantry.position.x > -4.8) craneGantry.position.x -= CRANE_VELOCITY;
+        if (keys.right && craneGantry.position.x < 4.8) craneGantry.position.x += CRANE_VELOCITY;
+      }
+
+      // 포스트 프로세싱 컴포저 렌더
+      composer.render();
+    }
+    renderLoop();
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      composer.setSize(window.innerWidth, window.innerHeight);
+    });
+  </script>
+</body>
+</html>
